@@ -175,7 +175,15 @@ export async function reloadPolicy(policy_path, options = {}) {
     trackingConfig.policy_joint_names = policyJointNames.slice();
   }
 
+  if (typeof config.compliance_flag_value === 'number') {
+    this.params.compliance_enabled = config.compliance_flag_value > 0.0;
+  }
+  if (typeof config.compliance_flag_threshold === 'number' && Number.isFinite(config.compliance_flag_threshold)) {
+    this.params.compliance_threshold = config.compliance_flag_threshold;
+  }
+
   this.simulation.resetData();
+  this.applyDefaultJointPose?.();
   this.simulation.forward();
   this.policyRunner = new PolicyRunner(
     {

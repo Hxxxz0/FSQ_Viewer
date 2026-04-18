@@ -40,6 +40,12 @@ function normalizeMotionClip(clip) {
 export class TrackingHelper {
   constructor(config) {
     this.transitionSteps = config.transition_steps ?? 100;
+    this.futureSteps = Array.isArray(config.future_steps) ? config.future_steps.slice() : [0, 2, 4, 8, 16];
+    this.futureHistoryLen = Math.max(0, ...this.futureSteps.map((step) => Math.max(0, -Math.trunc(step))));
+    const configuredTail = Number.isFinite(Number(config.switch_tail_keep_steps))
+      ? Math.max(0, Math.trunc(Number(config.switch_tail_keep_steps)))
+      : this.futureHistoryLen;
+    this.switchTailKeepSteps = Math.max(configuredTail, this.futureHistoryLen);
     this.datasetJointNames = config.dataset_joint_names ?? [];
     this.policyJointNames = config.policy_joint_names ?? [];
     this.motions = {};
@@ -219,6 +225,76 @@ export class TrackingHelper {
     };
   }
 
+  _readRefTailState(state) {
+    if (this.refLen > 0 && this.refJointPos.length && this.refRootPos.length && this.refRootQuat.length) {
+      const tailIndex = this.refLen - 1;
+      return {
+        jointPos: Array.from(this.refJointPos[tailIndex]),
+        rootPos: Array.from(this.refRootPos[tailIndex]),
+        rootQuat: Array.from(this.refRootQuat[tailIndex])
+      };
+    }
+    return this._readCurrentState(state);
+  }
+
+  _collectReferenceTail() {
+    if (this.refLen <= 0) {
+      return {
+        jointPos: [],
+        rootPos: [],
+        rootQuat: [],
+        anchorIndex: 0
+      };
+    }
+    const keepHist = Math.max(this.futureHistoryLen, this.switchTailKeepSteps) + 2;
+    const currentIdx = Math.max(0, Math.min(this.refIdx, this.refLen - 1));
+    const start = Math.max(0, currentIdx - keepHist);
+    const end = currentIdx + 1;
+    return {
+      jointPos: this.refJointPos.slice(start, end).map((row) => Float32Array.from(row)),
+      rootPos: this.refRootPos.slice(start, end).map((row) => Float32Array.from(row)),
+      rootQuat: this.refRootQuat.slice(start, end).map((row) => Float32Array.from(row)),
+      anchorIndex: end - start - 1
+    };
+  }
+
+  _appendRefFrames(frames) {
+    if (!frames) {
+      return;
+    }
+    const jointPos = Array.isArray(frames.jointPos) ? frames.jointPos : [];
+    const rootPos = Array.isArray(frames.rootPos) ? frames.rootPos : [];
+    const rootQuat = Array.isArray(frames.rootQuat) ? frames.rootQuat : [];
+    if (jointPos.length === 0 || rootPos.length === 0 || rootQuat.length === 0) {
+      return;
+    }
+
+    this.refJointPos.push(...jointPos.map((row) => Float32Array.from(row)));
+    this.refRootPos.push(...rootPos.map((row) => Float32Array.from(row)));
+    this.refRootQuat.push(...rootQuat.map((row) => Float32Array.from(row)));
+    this.refLen = this.refJointPos.length;
+    this.currentDone = this.refIdx >= this.refLen - 1;
+    this._trimRefPrefix();
+  }
+
+  _trimRefPrefix() {
+    if (this.refLen <= 0) {
+      return;
+    }
+    const keepHist = Math.max(this.futureHistoryLen, this.switchTailKeepSteps) + 2;
+    const drop = Math.max(0, this.refIdx - keepHist);
+    if (drop <= 0) {
+      return;
+    }
+
+    this.refJointPos.splice(0, drop);
+    this.refRootPos.splice(0, drop);
+    this.refRootQuat.splice(0, drop);
+    this.refIdx -= drop;
+    this.refLen = this.refJointPos.length;
+    this.currentDone = this.refIdx >= this.refLen - 1;
+  }
+
   _alignMotionToCurrent(motion, curr) {
     const p0 = new THREE.Vector3(...motion.rootPos[0]);
     const pc = new THREE.Vector3(...curr.rootPos);
@@ -264,7 +340,8 @@ export class TrackingHelper {
   }
 
   _startMotionFromCurrent(name, state) {
-    const curr = this._readCurrentState(state);
+    const preservedTail = this._collectReferenceTail();
+    const curr = this._readRefTailState(state);
     const motion = this.motions[name];
     const aligned = this._alignMotionToCurrent(motion, curr);
     const firstFrame = {
@@ -275,16 +352,21 @@ export class TrackingHelper {
 
     const transition = this._buildTransition(curr, firstFrame);
 
-    this.refJointPos = [...transition.jointPos, ...aligned.jointPos];
-    this.refRootQuat = [...transition.rootQuat, ...aligned.rootQuat];
-    this.refRootPos = [...transition.rootPos, ...aligned.rootPos];
+    this.refJointPos = preservedTail.jointPos.slice();
+    this.refRootQuat = preservedTail.rootQuat.slice();
+    this.refRootPos = preservedTail.rootPos.slice();
 
     this.transitionLen = transition.jointPos.length;
     this.motionLen = aligned.jointPos.length;
-    this.refIdx = 0;
+    this.refIdx = preservedTail.anchorIndex;
     this.refLen = this.refJointPos.length;
+    this._appendRefFrames({
+      jointPos: [...transition.jointPos, ...aligned.jointPos],
+      rootQuat: [...transition.rootQuat, ...aligned.rootQuat],
+      rootPos: [...transition.rootPos, ...aligned.rootPos]
+    });
     this.currentName = name;
-    this.currentDone = this.refLen <= 1;
+    this.currentDone = this.refIdx >= this.refLen - 1;
   }
 
   _buildDatasetToPolicyMap() {

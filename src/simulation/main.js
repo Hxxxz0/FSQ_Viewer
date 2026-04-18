@@ -358,12 +358,26 @@ export class MuJoCoDemo {
     };
   }
 
+  applyDefaultJointPose() {
+    if (!this.simulation || !this.defaultJposPolicy || !this.qpos_adr_policy || !this.qvel_adr_policy) {
+      return;
+    }
+    for (let i = 0; i < this.numActions; i++) {
+      const qposAdr = this.qpos_adr_policy[i];
+      const qvelAdr = this.qvel_adr_policy[i];
+      this.simulation.qpos[qposAdr] = this.defaultJposPolicy[i] ?? 0.0;
+      this.simulation.qvel[qvelAdr] = 0.0;
+    }
+    this.simulation.forward();
+  }
+
   resetSimulation() {
     if (!this.simulation) {
       return;
     }
     this.params.paused = true;
     this.simulation.resetData();
+    this.applyDefaultJointPose();
     this.simulation.forward();
     this.actionTarget = null;
     if (this.policyRunner) {

@@ -42,6 +42,45 @@ class RootAngVelB {
   }
 }
 
+class RootAngVelHistory {
+  constructor(_policy, kwargs = {}) {
+    const { history_steps = [0] } = kwargs;
+    this.historySteps = history_steps.slice();
+    this.maxStep = Math.max(...this.historySteps);
+    this.history = Array.from({ length: this.maxStep + 1 }, () => new Float32Array(3));
+  }
+
+  get size() {
+    return this.historySteps.length * 3;
+  }
+
+  reset(state) {
+    const source = state?.rootAngVel ?? new Float32Array(3);
+    this.history[0].set(source);
+    for (let i = 1; i < this.history.length; i++) {
+      this.history[i].set(this.history[0]);
+    }
+  }
+
+  update(state) {
+    for (let i = this.history.length - 1; i > 0; i--) {
+      this.history[i].set(this.history[i - 1]);
+    }
+    this.history[0].set(state?.rootAngVel ?? new Float32Array(3));
+  }
+
+  compute() {
+    const out = new Float32Array(this.size);
+    let offset = 0;
+    for (const step of this.historySteps) {
+      const idx = Math.min(step, this.history.length - 1);
+      out.set(this.history[idx], offset);
+      offset += 3;
+    }
+    return out;
+  }
+}
+
 class ProjectedGravityB {
   constructor() {
     this.gravity = new THREE.Vector3(0, 0, -1);
@@ -56,6 +95,53 @@ class ProjectedGravityB {
     const quatObj = new THREE.Quaternion(quat[1], quat[2], quat[3], quat[0]);
     const gravityLocal = this.gravity.clone().applyQuaternion(quatObj.clone().invert());
     return new Float32Array([gravityLocal.x, gravityLocal.y, gravityLocal.z]);
+  }
+}
+
+class ProjectedGravityHistory {
+  constructor(_policy, kwargs = {}) {
+    const { history_steps = [0] } = kwargs;
+    this.historySteps = history_steps.slice();
+    this.maxStep = Math.max(...this.historySteps);
+    this.gravity = new THREE.Vector3(0, 0, -1);
+    this.history = Array.from({ length: this.maxStep + 1 }, () => new Float32Array(3));
+  }
+
+  get size() {
+    return this.historySteps.length * 3;
+  }
+
+  _computeProjectedGravity(state) {
+    const quat = state?.rootQuat ?? [1.0, 0.0, 0.0, 0.0];
+    const quatObj = new THREE.Quaternion(quat[1], quat[2], quat[3], quat[0]);
+    const gravityLocal = this.gravity.clone().applyQuaternion(quatObj.clone().invert());
+    return Float32Array.from([gravityLocal.x, gravityLocal.y, gravityLocal.z]);
+  }
+
+  reset(state) {
+    const source = this._computeProjectedGravity(state);
+    this.history[0].set(source);
+    for (let i = 1; i < this.history.length; i++) {
+      this.history[i].set(this.history[0]);
+    }
+  }
+
+  update(state) {
+    for (let i = this.history.length - 1; i > 0; i--) {
+      this.history[i].set(this.history[i - 1]);
+    }
+    this.history[0].set(this._computeProjectedGravity(state));
+  }
+
+  compute() {
+    const out = new Float32Array(this.size);
+    let offset = 0;
+    for (const step of this.historySteps) {
+      const idx = Math.min(step, this.history.length - 1);
+      out.set(this.history[idx], offset);
+      offset += 3;
+    }
+    return out;
   }
 }
 
@@ -238,6 +324,46 @@ class TargetProjectedGravityBObs {
   }
 }
 
+class JointVelHistory {
+  constructor(policy, kwargs = {}) {
+    const { history_steps = [0] } = kwargs;
+    this.historySteps = history_steps.slice();
+    this.numJoints = policy.numActions;
+    this.maxStep = Math.max(...this.historySteps);
+    this.history = Array.from({ length: this.maxStep + 1 }, () => new Float32Array(this.numJoints));
+  }
+
+  get size() {
+    return this.historySteps.length * this.numJoints;
+  }
+
+  reset(state) {
+    const source = state?.jointVel ?? new Float32Array(this.numJoints);
+    this.history[0].set(source);
+    for (let i = 1; i < this.history.length; i++) {
+      this.history[i].set(this.history[0]);
+    }
+  }
+
+  update(state) {
+    for (let i = this.history.length - 1; i > 0; i--) {
+      this.history[i].set(this.history[i - 1]);
+    }
+    this.history[0].set(state?.jointVel ?? new Float32Array(this.numJoints));
+  }
+
+  compute() {
+    const out = new Float32Array(this.size);
+    let offset = 0;
+    for (const step of this.historySteps) {
+      const idx = Math.min(step, this.history.length - 1);
+      out.set(this.history[idx], offset);
+      offset += this.numJoints;
+    }
+    return out;
+  }
+}
+
 
 class PrevActions {
   /**
@@ -249,8 +375,8 @@ class PrevActions {
    */
   constructor(policy, kwargs = {}) {
     this.policy = policy;
-    const { history_steps = 4 } = kwargs;
-    this.steps = Math.max(1, Math.floor(history_steps));
+    const rawSteps = kwargs.steps ?? kwargs.history_steps ?? 4;
+    this.steps = Math.max(1, Math.floor(rawSteps));
     this.numActions = policy.numActions;
     this.actionBuffer = Array.from({ length: this.steps }, () => new Float32Array(this.numActions));
   }
@@ -296,8 +422,11 @@ export const Observations = {
   BootIndicator,
   ComplianceFlagObs,
   RootAngVelB,
+  RootAngVelHistory,
   ProjectedGravityB,
+  ProjectedGravityHistory,
   JointPos,
+  JointVelHistory,
   TrackingCommandObsRaw,
   TargetRootZObs,
   TargetJointPosObs,

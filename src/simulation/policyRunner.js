@@ -18,6 +18,7 @@ export class PolicyRunner {
     this.actionClip = typeof config.action_clip === 'number' ? config.action_clip : 10.0;
 
     this.module = new ONNXModule(config.onnx);
+    this.inputKey = this._resolveObsInputKey(config);
     this.inputDict = {};
     this.isInferencing = false;
     this.lastActions = new Float32Array(this.numActions);
@@ -30,7 +31,7 @@ export class PolicyRunner {
       });
     }
 
-    this.obsModules = this._buildObsModules(config.obs_config);
+    this.obsModules = this._buildObsModules(config.obs_config, this.inputKey);
     this.numObs = this.obsModules.reduce((sum, obs) => sum + (obs.size ?? 0), 0);
   }
 
@@ -39,8 +40,22 @@ export class PolicyRunner {
     this.reset();
   }
 
-  _buildObsModules(obsConfig) {
-    const obsList = (obsConfig && Array.isArray(obsConfig.policy)) ? obsConfig.policy : [];
+  _resolveObsInputKey(config) {
+    const obsConfig = config?.obs_config ?? {};
+    const inKeys = Array.isArray(config?.onnx?.meta?.in_keys) ? config.onnx.meta.in_keys : [];
+    const preferredKey = inKeys.find((key) => typeof key === 'string' && Array.isArray(obsConfig[key]));
+    if (preferredKey) {
+      return preferredKey;
+    }
+    const fallbackKey = inKeys.find((key) => typeof key === 'string' && key !== 'adapt_hx' && key !== 'is_init');
+    if (fallbackKey) {
+      return fallbackKey;
+    }
+    return Array.isArray(obsConfig.policy) ? 'policy' : Object.keys(obsConfig)[0] ?? 'policy';
+  }
+
+  _buildObsModules(obsConfig, inputKey) {
+    const obsList = Array.isArray(obsConfig?.[inputKey]) ? obsConfig[inputKey] : [];
     return obsList.map((obsConfigEntry) => {
       const ObsClass = Observations[obsConfigEntry.name];
       if (!ObsClass) {
@@ -92,7 +107,7 @@ export class PolicyRunner {
         offset += obsArray.length;
       }
 
-      this.inputDict['policy'] = new ort.Tensor('float32', obsForPolicy, [1, obsForPolicy.length]);
+      this.inputDict[this.inputKey] = new ort.Tensor('float32', obsForPolicy, [1, obsForPolicy.length]);
 
       const [result, carry] = await this.module.runInference(this.inputDict);
       this.inputDict = { ...this.inputDict, ...carry };

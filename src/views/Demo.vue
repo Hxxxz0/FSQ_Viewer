@@ -301,6 +301,12 @@ export default {
         description: 'Tracking policy with compliance input enabled.',
         policyPath: './examples/checkpoints/g1/tracking_policy_latest.json',
         onnxPath: './examples/checkpoints/g1/policy_latest.onnx'
+      },
+      {
+        value: 'g1-tracking-fsq',
+        title: 'G1 Tracking FSQ',
+        description: 'FSQ distill policy with 1590-dim policy_distill observations.',
+        policyPath: './examples/checkpoints/g1/tracking_policy_fsq.json'
       }
     ],
     currentPolicy: 'g1-tracking-latest',
@@ -673,6 +679,11 @@ export default {
           onnxPath: selected.onnxPath || undefined
         });
         this.policyLabel = selected.policyPath?.split('/').pop() ?? this.policyLabel;
+        this.complianceEnabled = Boolean(this.demo.params?.compliance_enabled);
+        const threshold = Number(this.demo.params?.compliance_threshold);
+        if (Number.isFinite(threshold)) {
+          this.complianceThreshold = threshold;
+        }
         this.reapplyCustomMotions();
         this.availableMotions = this.getAvailableMotions();
         this.currentMotion = this.demo.params.current_motion ?? this.availableMotions[0] ?? null;
