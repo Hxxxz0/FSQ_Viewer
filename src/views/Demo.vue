@@ -307,6 +307,12 @@ export default {
         title: 'G1 Tracking FSQ',
         description: 'FSQ distill policy with 1590-dim policy_distill observations.',
         policyPath: './examples/checkpoints/g1/tracking_policy_fsq.json'
+      },
+      {
+        value: 'g1-tracking-fsq-0423',
+        title: 'G1 Tracking FSQ 04-23',
+        description: 'FSQ distill (04-23) with ref-obs semantics for policy_distill.',
+        policyPath: './examples/checkpoints/g1/tracking_policy_fsq_0423.json'
       }
     ],
     currentPolicy: 'g1-tracking-latest',

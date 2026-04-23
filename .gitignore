@@ -43,3 +43,28 @@ Thumbs.db
 .cache
 .temp
 dist
+
+# Training artifacts (local only, root level only)
+/G1TRACKING-*/
+/*.zip
+
+# Training code (separate repo)
+mjlab_distill/
+
+# Test results
+test-results/
+
+# Claude Code local config
+.claude/
+
+# PyTorch checkpoints (only need ONNX for deployment)
+*.pt
+
+# Inactive checkpoint models (keep only active ones)
+public/examples/checkpoints/g1/G1TRACKING-04-09_12-22/
+public/examples/checkpoints/g1/G1TRACKING-04-22_08-13/
+public/examples/checkpoints/g1/G1TRACKING-04-22_10-13/
+public/examples/checkpoints/g1/G1TRACKING-04-22_10-27/
+public/examples/checkpoints/g1/G1TRACKING-04-22_13-30/
+public/examples/checkpoints/g1/G1TRACKING-04-22_14-18/
+public/examples/checkpoints/g1/G1TRACKING-04-23_14-05/

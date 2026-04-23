@@ -1,0 +1,28 @@
+{
+    "action_scaling": {
+        ".*elbow_joint": 1.0,
+        ".*shoulder.*": 1.0,
+        ".*wrist.*": 1.0,
+        ".*hip_roll.*": 0.5,
+        ".*hip_yaw.*": 0.5,
+        ".*hip_pitch.*": 0.5,
+        ".*knee.*": 0.5,
+        ".*waist.*": 0.5,
+        ".*ankle.*": 0.5
+    },
+    "in_keys": [
+        "policy_distill"
+    ],
+    "out_keys": [
+        "policy_distill",
+        "action"
+    ],
+    "in_shapes": [
+        [
+            [
+                1,
+                1590
+            ]
+        ]
+    ]
+}

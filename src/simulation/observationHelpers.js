@@ -234,6 +234,88 @@ class TrackingCommandObsRaw {
   }
 }
 
+class TrackingCommandRefObs {
+  constructor(policy, kwargs = {}) {
+    this.policy = policy;
+    this.futureSteps = kwargs.future_steps ?? [0, 2, 4, 8, 16];
+    const nFut = this.futureSteps.length;
+    this.outputLength = (nFut - 1) * 3 + nFut * 6;
+  }
+
+  get size() {
+    return this.outputLength;
+  }
+
+  compute(state) {
+    const tracking = this.policy.tracking;
+    if (!tracking || !tracking.isReady()) {
+      return new Float32Array(this.outputLength);
+    }
+
+    const baseIdx = tracking.refIdx;
+    const refLen = tracking.refLen;
+    const indices = clampFutureIndices(baseIdx, this.futureSteps, refLen);
+
+    const basePos = tracking.refRootPos[indices[0]];
+    const baseQuat = normalizeQuat(tracking.refRootQuat[indices[0]]);
+
+    const posDiff = [];
+    for (let i = 1; i < indices.length; i++) {
+      const pos = tracking.refRootPos[indices[i]];
+      const diff = [pos[0] - basePos[0], pos[1] - basePos[1], pos[2] - basePos[2]];
+      const diffB = quatApplyInv(baseQuat, diff);
+      posDiff.push(diffB[0], diffB[1], diffB[2]);
+    }
+
+    const refQuat0Inv = quatInverse(baseQuat);
+    const rot6d = [];
+    for (let i = 0; i < indices.length; i++) {
+      const refQuat = normalizeQuat(tracking.refRootQuat[indices[i]]);
+      const rel = quatMultiply(refQuat0Inv, refQuat);
+      const r6 = quatToRot6d(rel);
+      rot6d.push(r6[0], r6[1], r6[2], r6[3], r6[4], r6[5]);
+    }
+
+    return Float32Array.from([...posDiff, ...rot6d]);
+  }
+}
+
+class TargetJointPosRefObs {
+  constructor(policy, kwargs = {}) {
+    this.policy = policy;
+    this.futureSteps = kwargs.future_steps ?? [0, 2, 4, 8, 16];
+  }
+
+  get size() {
+    const nJoints = this.policy.tracking?.nJoints ?? 0;
+    return this.futureSteps.length * nJoints * 2;
+  }
+
+  compute(state) {
+    const tracking = this.policy.tracking;
+    if (!tracking || !tracking.isReady()) {
+      return new Float32Array(this.size);
+    }
+    const indices = clampFutureIndices(tracking.refIdx, this.futureSteps, tracking.refLen);
+    const out = new Float32Array(indices.length * tracking.nJoints);
+    const outDiff = new Float32Array(indices.length * tracking.nJoints);
+    const startJointPos = tracking.refJointPos[indices[0]];
+    let offset = 0;
+    for (const idx of indices) {
+      const target = tracking.refJointPos[idx];
+      out.set(target, offset);
+      for (let j = 0; j < tracking.nJoints; j++) {
+        outDiff[offset + j] = target[j] - startJointPos[j];
+      }
+      offset += tracking.nJoints;
+    }
+    const merged = new Float32Array(out.length + outDiff.length);
+    merged.set(out, 0);
+    merged.set(outDiff, out.length);
+    return merged;
+  }
+}
+
 class TargetRootZObs {
   constructor(policy, kwargs = {}) {
     this.policy = policy;
@@ -428,7 +510,9 @@ export const Observations = {
   JointPos,
   JointVelHistory,
   TrackingCommandObsRaw,
+  TrackingCommandRefObs,
   TargetRootZObs,
   TargetJointPosObs,
+  TargetJointPosRefObs,
   TargetProjectedGravityBObs
 };

@@ -17,7 +17,7 @@
         ]
       ]
     },
-    "path": "./examples/checkpoints/g1/G1TRACKING-04-13_16-59/policy.onnx"
+    "path": "./examples/checkpoints/g1/G1TRACKING-04-18_05-33/policy.onnx"
   },
   "obs_config": {
     "policy_distill": [
