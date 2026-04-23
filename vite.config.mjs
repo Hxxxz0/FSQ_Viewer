@@ -10,7 +10,7 @@ import { fileURLToPath, URL } from 'node:url'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  base: '/',
+  base: '/FSQ_Viewer/',
   plugins: [
     Vue({
       template: { transformAssetUrls },
