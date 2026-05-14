@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { DragStateManager } from './utils/DragStateManager.js';
 import { downloadExampleScenesFolder, getPosition, getQuaternion, toMujocoPos, reloadScene, reloadPolicy } from './mujocoUtils.js';
 
-const defaultPolicy = "./examples/checkpoints/g1/tracking_policy_latest.json";
+const defaultPolicy = "./examples/checkpoints/g1/tracking_policy_finetune_0514.json";
 
 export class MuJoCoDemo {
   constructor(mujoco) {

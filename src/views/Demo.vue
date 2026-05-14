@@ -296,11 +296,16 @@ export default {
     trackingTimer: null,
     policies: [
       {
-        value: 'g1-tracking-latest',
-        title: 'G1 Tracking',
-        description: 'Tracking policy with compliance input enabled.',
-        policyPath: './examples/checkpoints/g1/tracking_policy_latest.json',
-        onnxPath: './examples/checkpoints/g1/policy_latest.onnx'
+        value: 'g1-tracking-finetune-0514',
+        title: 'G1 Tracking Finetune 05-14',
+        description: 'Finetune (teacher-style) with 1590-dim policy observations and compliance control.',
+        policyPath: './examples/checkpoints/g1/tracking_policy_finetune_0514.json'
+      },
+      {
+        value: 'g1-tracking-fsq-0423',
+        title: 'G1 Tracking FSQ 04-23',
+        description: 'FSQ distill (04-23) with ref-obs semantics for policy_distill.',
+        policyPath: './examples/checkpoints/g1/tracking_policy_fsq_0423.json'
       },
       {
         value: 'g1-tracking-fsq',
@@ -309,13 +314,14 @@ export default {
         policyPath: './examples/checkpoints/g1/tracking_policy_fsq.json'
       },
       {
-        value: 'g1-tracking-fsq-0423',
-        title: 'G1 Tracking FSQ 04-23',
-        description: 'FSQ distill (04-23) with ref-obs semantics for policy_distill.',
-        policyPath: './examples/checkpoints/g1/tracking_policy_fsq_0423.json'
+        value: 'g1-tracking-latest',
+        title: 'G1 Tracking',
+        description: 'Tracking policy with compliance input enabled.',
+        policyPath: './examples/checkpoints/g1/tracking_policy_latest.json',
+        onnxPath: './examples/checkpoints/g1/policy_latest.onnx'
       }
     ],
-    currentPolicy: 'g1-tracking-latest',
+    currentPolicy: 'g1-tracking-finetune-0514',
     policyLabel: '',
     isPolicyLoading: false,
     policyLoadError: '',
